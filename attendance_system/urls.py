@@ -18,6 +18,7 @@ urlpatterns = [
     path("attendance/mark/", views.mark_attendance_page, name="mark-attendance"),
     path("attendance/recognize/", views.recognize_attendance, name="recognize-attendance"),
     path("attendance/records/", views.attendance_records, name="attendance-records"),
+    path("attendance/<int:pk>/toggle/", views.attendance_toggle_status, name="attendance-toggle"),
     path("attendance/export.csv/", views.attendance_export, name="attendance-export"),
     path("settings/", views.settings_view, name="settings"),
     path("manus-routes.json", views.route_manifest, name="route-manifest"),

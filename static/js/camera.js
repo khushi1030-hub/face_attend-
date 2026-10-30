@@ -35,7 +35,27 @@
     const status = document.getElementById('recognition-status');
     const canvas = document.getElementById('attendance-capture');
     const count = document.getElementById('scan-count');
-    let stream = null, timer = null, busy = false, scans = 0;
+    const exitCount = document.getElementById('exit-scan-count');
+    const modeEntryBtn = document.getElementById('mode-entry-btn');
+    const modeExitBtn = document.getElementById('mode-exit-btn');
+    const cornerLabel = document.getElementById('video-corner-label');
+    const eyebrow = document.getElementById('camera-eyebrow');
+    const heading = document.getElementById('camera-heading');
+    const subtitle = document.getElementById('camera-subtitle');
+    const faceGuide = document.getElementById('face-guide');
+
+    let stream = null, timer = null, busy = false, scans = 0, exitScans = 0;
+    let currentMode = 'entry'; // 'entry' or 'exit'
+
+    const updateModeUI = (mode) => {
+      if (typeof window.switchScanMode === 'function') {
+        window.switchScanMode(mode);
+      }
+    };
+
+    modeEntryBtn?.addEventListener('click', () => updateModeUI('entry'));
+    modeExitBtn?.addEventListener('click', () => updateModeUI('exit'));
+
     const stopCamera = () => {
       if (timer) window.clearInterval(timer);
       timer = null;
@@ -43,25 +63,58 @@
       stream = null; attendanceVideo.srcObject = null;
       startAttendance.classList.remove('hidden'); stop?.classList.add('hidden'); placeholder?.classList.remove('hidden');
       state?.classList.remove('active'); state?.classList.add('off'); if (state) state.innerHTML = '<i></i> CAMERA OFF';
-      setStatus(status, 'idle', 'Camera paused', 'Start the camera to begin scanning.');
+      const activeMode = document.getElementById('current-scan-mode')?.value || 'entry';
+      if (activeMode === 'exit') {
+        setStatus(status, 'warning', 'Camera paused (Exit Mode)', 'Start the camera to begin exit scanning.');
+      } else {
+        setStatus(status, 'idle', 'Camera paused', 'Start the camera to begin scanning.');
+      }
     };
     const scan = async () => {
       if (busy || !stream || attendanceVideo.readyState < 2) return;
-      busy = true; setStatus(status, 'scanning', 'Scanning face…', 'Comparing against verified student profiles.');
+      busy = true;
+      const activeMode = document.getElementById('current-scan-mode')?.value || 'entry';
+      setStatus(status, 'scanning', activeMode === 'exit' ? 'Scanning departing face…' : 'Scanning face…', 'Comparing against verified student profiles.');
       canvas.width = attendanceVideo.videoWidth || 640; canvas.height = attendanceVideo.videoHeight || 480;
       canvas.getContext('2d').drawImage(attendanceVideo, 0, 0, canvas.width, canvas.height);
       try {
-        const response = await fetch('/attendance/recognize/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf(), 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ image: canvas.toDataURL('image/jpeg', .82) }) });
+        const response = await fetch('/attendance/recognize/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf(), 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({ image: canvas.toDataURL('image/jpeg', .82), mode: activeMode })
+        });
         const payload = await response.json();
         const detail = [payload.message, payload.roll_number, payload.date, payload.time].filter(Boolean).join(' · ');
-        if (payload.recognized && payload.attendance_marked) {
-          scans += 1; if (count) count.textContent = scans;
-          setStatus(status, 'success', `✓ ${payload.student_name}`, detail);
-        } else if (payload.recognized) {
-          setStatus(status, 'warning', 'Attendance already marked today.', `${payload.student_name || 'Student'} · ${payload.roll_number || ''} · ${payload.date || ''} ${payload.time || ''}`);
-        } else if (payload.message?.toLowerCase().includes('no face')) setStatus(status, 'warning', 'No face detected.', 'Please position your face inside the detection frame.');
-        else if (payload.message?.toLowerCase().includes('multiple')) setStatus(status, 'warning', 'Multiple faces detected.', 'Please make sure only one student is visible.');
-        else setStatus(status, response.ok ? 'warning' : 'error', payload.message || 'Student not recognized.', 'Try again with one face clearly inside the guide.');
+
+        if (payload.action === 'exit') {
+          if (payload.recognized && payload.attendance_marked) {
+            exitScans += 1;
+            if (exitCount) exitCount.textContent = exitScans;
+            setStatus(status, 'error', `✕ ${payload.student_name} (Left Early)`, detail);
+          } else if (payload.recognized) {
+            setStatus(status, 'warning', payload.student_name || 'Student', payload.message || 'Student was already marked Absent.');
+          } else if (payload.message?.toLowerCase().includes('no face')) {
+            setStatus(status, 'warning', 'No face detected.', 'Please position your face inside the detection frame.');
+          } else if (payload.message?.toLowerCase().includes('multiple')) {
+            setStatus(status, 'warning', 'Multiple faces detected.', 'Please make sure only one student is visible.');
+          } else {
+            setStatus(status, response.ok ? 'warning' : 'error', payload.message || 'Student not recognized.', 'Try again with one face clearly inside the guide.');
+          }
+        } else {
+          // Check-in (entry)
+          if (payload.recognized && payload.attendance_marked) {
+            scans += 1; if (count) count.textContent = scans;
+            setStatus(status, 'success', `✓ ${payload.student_name}`, detail);
+          } else if (payload.recognized) {
+            setStatus(status, 'warning', 'Attendance already marked today.', `${payload.student_name || 'Student'} · ${payload.roll_number || ''} · ${payload.date || ''} ${payload.time || ''}`);
+          } else if (payload.message?.toLowerCase().includes('no face')) {
+            setStatus(status, 'warning', 'No face detected.', 'Please position your face inside the detection frame.');
+          } else if (payload.message?.toLowerCase().includes('multiple')) {
+            setStatus(status, 'warning', 'Multiple faces detected.', 'Please make sure only one student is visible.');
+          } else {
+            setStatus(status, response.ok ? 'warning' : 'error', payload.message || 'Student not recognized.', 'Try again with one face clearly inside the guide.');
+          }
+        }
       } catch (error) { setStatus(status, 'error', 'Frame processing error', 'The server could not process this frame. Please try again.'); }
       finally { busy = false; }
     };

@@ -256,7 +256,7 @@ class AttendanceWorkflowTests(StaffTestCase):
         self.assertEqual(first.json()["recognized"], True)
         self.assertEqual(first.json()["attendance_marked"], True)
         self.assertEqual(first.json()["student_name"], student.name)
-        self.assertEqual(set(first.json()), {"recognized", "attendance_marked", "student_name", "roll_number", "message", "date", "time"})
+        self.assertEqual(set(first.json()), {"recognized", "action", "attendance_marked", "student_name", "roll_number", "message", "date", "time"})
         self.assertEqual(first.json()["date"], timezone.localdate().isoformat())
         self.assertTrue(first.json()["time"])
         self.assertEqual(second.json()["attendance_marked"], False)
@@ -383,3 +383,62 @@ class AttendanceWorkflowTests(StaffTestCase):
         page_two = self.client.get(reverse("attendance-records"), {"student": one.pk, "page": 2})
         self.assertEqual(page_two.status_code, 200)
         self.assertEqual(page_two.context["page_obj"].number, 2)
+
+    def test_attendance_toggle_status_mark_absent_and_present(self):
+        student = self.make_student(name="Rahul Sharma", roll="23CSE105")
+        day = timezone.localdate()
+        session = AttendanceSession.objects.create(date=day, opened_by=self.user)
+        record = Attendance.objects.create(
+            student=student,
+            session=session,
+            date=day,
+            status=Attendance.Status.PRESENT,
+            time=timezone.localtime().time(),
+        )
+
+        # Mark Absent (e.g. left early)
+        response = self.client.post(
+            reverse("attendance-toggle", args=[record.pk]),
+            {"action": "mark_absent", "next": reverse("dashboard")},
+        )
+        self.assertRedirects(response, reverse("dashboard"))
+        record.refresh_from_db()
+        self.assertEqual(record.status, Attendance.Status.ABSENT)
+        self.assertIsNone(record.time)
+
+        # Mark Present
+        response = self.client.post(
+            reverse("attendance-toggle", args=[record.pk]),
+            {"action": "mark_present", "next": reverse("dashboard")},
+        )
+        self.assertRedirects(response, reverse("dashboard"))
+        record.refresh_from_db()
+        self.assertEqual(record.status, Attendance.Status.PRESENT)
+        self.assertIsNotNone(record.time)
+
+    def test_recognized_student_exit_scan_marks_absent(self):
+        student = self.make_student(name="Samir Khan", roll="23CSE109")
+        self.client.get(reverse("mark-attendance"))
+        frame_entry = json.dumps({"image": image_data_url(), "mode": "entry"})
+        frame_exit = json.dumps({"image": image_data_url(), "mode": "exit"})
+
+        with patch("attendance.views.recognize_face", return_value=(student, 0.1)):
+            # 1. Entry scan -> marks Present
+            entry_resp = self.client.post(reverse("recognize-attendance"), data=frame_entry, content_type="application/json")
+            self.assertEqual(entry_resp.json()["attendance_marked"], True)
+            record = Attendance.objects.get(student=student, date=timezone.localdate())
+            self.assertEqual(record.status, Attendance.Status.PRESENT)
+
+            # 2. Exit scan -> marks Left Early / Absent
+            exit_resp = self.client.post(reverse("recognize-attendance"), data=frame_exit, content_type="application/json")
+            self.assertEqual(exit_resp.json()["attendance_marked"], True)
+            self.assertEqual(exit_resp.json()["action"], "exit")
+            self.assertIn("Left Early", exit_resp.json()["message"])
+            record.refresh_from_db()
+            self.assertEqual(record.status, Attendance.Status.ABSENT)
+            self.assertIsNone(record.time)
+
+            # 3. Repeat Exit scan on already Absent student
+            repeat_exit = self.client.post(reverse("recognize-attendance"), data=frame_exit, content_type="application/json")
+            self.assertEqual(repeat_exit.json()["attendance_marked"], False)
+            self.assertIn("already marked Absent", repeat_exit.json()["message"])

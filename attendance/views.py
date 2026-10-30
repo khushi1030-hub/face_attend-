@@ -329,6 +329,7 @@ def recognize_attendance(request):
             return JsonResponse({"recognized": False, "attendance_marked": False, "message": "The captured frame is too large. Please try again."}, status=413)
         payload = json.loads(request.body.decode("utf-8"))
         image_data = payload.get("image", "")
+        mode = payload.get("mode", "entry").strip().lower()
         image_bytes = decode_data_url(image_data, max_bytes=5 * 1024 * 1024)
         students = Student.objects.exclude(face_encoding="").only("id", "name", "roll_number", "face_encoding")
         student, _distance = recognize_face(image_bytes, students)
@@ -346,39 +347,77 @@ def recognize_attendance(request):
                 "attendance_marked": False,
                 "message": "Open today's attendance session before scanning students.",
             }, status=409)
-        try:
-            with transaction.atomic():
-                _create_absent_rows(session)
-                record, _created = Attendance.objects.get_or_create(
-                    student=student,
-                    date=today,
-                    defaults={"session": session, "status": Attendance.Status.ABSENT},
-                )
-                record = Attendance.objects.select_for_update().get(pk=record.pk)
-                if record.status == Attendance.Status.PRESENT:
-                    marked = False
-                else:
+
+        if mode == "exit":
+            try:
+                with transaction.atomic():
+                    _create_absent_rows(session)
+                    record, _created = Attendance.objects.get_or_create(
+                        student=student,
+                        date=today,
+                        defaults={"session": session, "status": Attendance.Status.ABSENT},
+                    )
+                    record = Attendance.objects.select_for_update().get(pk=record.pk)
+                    if record.status == Attendance.Status.PRESENT:
+                        record.status = Attendance.Status.ABSENT
+                        record.time = None
+                        record.save(update_fields=["status", "time"])
+                        revoked = True
+                    else:
+                        revoked = False
+            except IntegrityError:
+                record = Attendance.objects.get(student=student, date=today)
+                revoked = record.status == Attendance.Status.PRESENT
+                if revoked:
+                    record.status = Attendance.Status.ABSENT
+                    record.time = None
+                    record.save(update_fields=["status", "time"])
+
+            return JsonResponse({
+                "recognized": True,
+                "action": "exit",
+                "attendance_marked": revoked,
+                "student_name": student.name,
+                "roll_number": student.roll_number,
+                "message": "Student marked Left Early (attendance revoked)." if revoked else "Student was already marked Absent.",
+                "date": timezone.localtime().date().isoformat(),
+                "time": timezone.localtime().strftime("%I:%M %p"),
+            })
+        else:
+            try:
+                with transaction.atomic():
+                    _create_absent_rows(session)
+                    record, _created = Attendance.objects.get_or_create(
+                        student=student,
+                        date=today,
+                        defaults={"session": session, "status": Attendance.Status.ABSENT},
+                    )
+                    record = Attendance.objects.select_for_update().get(pk=record.pk)
+                    if record.status == Attendance.Status.PRESENT:
+                        marked = False
+                    else:
+                        record.status = Attendance.Status.PRESENT
+                        record.time = timezone.localtime().time().replace(microsecond=0)
+                        record.save(update_fields=["status", "time"])
+                        marked = True
+            except IntegrityError:
+                # A parallel camera request may have marked the same student a moment earlier.
+                record = Attendance.objects.get(student=student, date=today)
+                marked = record.status != Attendance.Status.PRESENT
+                if marked:
                     record.status = Attendance.Status.PRESENT
                     record.time = timezone.localtime().time().replace(microsecond=0)
                     record.save(update_fields=["status", "time"])
-                    marked = True
-        except IntegrityError:
-            # A parallel camera request may have marked the same student a moment earlier.
-            record = Attendance.objects.get(student=student, date=today)
-            marked = record.status != Attendance.Status.PRESENT
-            if marked:
-                record.status = Attendance.Status.PRESENT
-                record.time = timezone.localtime().time().replace(microsecond=0)
-                record.save(update_fields=["status", "time"])
-        return JsonResponse({
-            "recognized": True,
-            "attendance_marked": marked,
-            "student_name": student.name,
-            "roll_number": student.roll_number,
-            "message": "Attendance marked successfully." if marked else "Attendance already marked today.",
-            "date": timezone.localtime().date().isoformat(),
-            "time": timezone.localtime().strftime("%I:%M %p"),
-        })
+            return JsonResponse({
+                "recognized": True,
+                "action": "entry",
+                "attendance_marked": marked,
+                "student_name": student.name,
+                "roll_number": student.roll_number,
+                "message": "Attendance marked successfully." if marked else "Attendance already marked today.",
+                "date": timezone.localtime().date().isoformat(),
+                "time": timezone.localtime().strftime("%I:%M %p"),
+            })
     except FaceRecognitionError as error:
         code = 503 if error.code == "backend_unavailable" else 400 if error.code == "invalid_image" else 200
         message = "No face detected. Please position your face inside the detection frame." if error.code == "no_face" else error.message
@@ -428,6 +467,30 @@ def attendance_records(request):
         "filters": filters,
         "students": Student.objects.only("id", "name", "roll_number").order_by("name"),
     })
+
+
+@private_staff_view
+@require_POST
+def attendance_toggle_status(request, pk):
+    """Manually toggle a student's attendance between Present and Absent (e.g. if a student left early)."""
+    record = get_object_or_404(Attendance.objects.select_related("student"), pk=pk)
+    action = request.POST.get("action", "").strip()
+
+    if action == "mark_absent" or (not action and record.status == Attendance.Status.PRESENT):
+        record.status = Attendance.Status.ABSENT
+        record.time = None
+        record.save(update_fields=["status", "time"])
+        messages.warning(request, f"{record.student.name} marked Absent (attendance revoked / left early).")
+    elif action == "mark_present" or (not action and record.status == Attendance.Status.ABSENT):
+        record.status = Attendance.Status.PRESENT
+        record.time = timezone.localtime().time().replace(microsecond=0)
+        record.save(update_fields=["status", "time"])
+        messages.success(request, f"{record.student.name} manually marked Present.")
+
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or ""
+    if not url_has_allowed_host_and_scheme(next_url, {request.get_host()}, require_https=request.is_secure()):
+        next_url = "dashboard"
+    return redirect(next_url)
 
 
 def _safe_csv_text(value: str) -> str:

@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#071321">
   <title>{% block title %}Campus AI Attendance{% endblock %}</title>
   <link rel="icon" type="image/png" href="{% static 'images/project-logo.png' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v={% now 'U' %}">
   <script defer src="{% static 'js/main.js' %}"></script>
   {% block extra_head %}{% endblock %}
 </head>
