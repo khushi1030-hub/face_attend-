@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Mark Attendance · Campus AI Attendance{% endblock %}
+{% block page_heading %}Mark Attendance{% endblock %}
+{% block content %}
+<section class="page-heading-row"><div><div class="eyebrow">LIVE RECOGNITION · {{ today_session.date|date:"l, d F Y" }}</div><h1>Mark attendance</h1><p class="muted">Today's session is open. Present records are created only after a verified face match.</p></div><a class="button button-ghost" href="{% url 'attendance-records' %}">View records ↗</a></section>
+<div class="attendance-layout">
+  <section class="panel camera-panel"><div class="panel-heading"><div><div class="eyebrow">LIVE CAMERA</div><h2>Position one student</h2><p class="muted">Look directly at the camera and keep the face inside the guide.</p></div><span class="camera-active-pill off" id="camera-state"><i></i> CAMERA OFF</span></div>
+    <div class="video-stage attendance-video-stage"><video id="attendance-video" autoplay playsinline muted></video><div class="face-guide" aria-hidden="true"><i></i></div><div class="video-placeholder" id="attendance-placeholder"><span class="camera-placeholder-icon">◎</span><strong>Camera is ready to start</strong><small>Your browser will request camera permission</small></div><div class="video-corner-label">AI VISION · LIVE</div></div>
+    <div class="scan-controls"><button type="button" class="button button-primary" id="camera-start"><span class="button-icon">◎</span> Start camera</button><button type="button" class="button button-secondary hidden" id="camera-stop">Stop camera</button><div class="scan-frequency"><i></i> One scan every 3 seconds</div></div>
+    <div class="recognition-status status-idle" id="recognition-status" aria-live="polite"><span class="status-indicator"></span><div><strong>Camera paused</strong><p>Start the camera to begin scanning.</p></div></div>
+  </section>
+  <aside class="attendance-aside">
+    <section class="panel today-session-card"><div class="session-overline"><span>SESSION OPEN</span><span class="session-status-dot"></span></div><h2>{{ today_session.date|date:"d" }}</h2><p>{{ today_session.date|date:"F Y" }}</p><div class="session-divider"></div><div class="session-details"><span>Registered students</span><strong>{{ student_count }}</strong></div><div class="session-details"><span>Unique marks</span><strong id="scan-count">0</strong></div></section>
+    <section class="panel instruction-card"><div class="panel-heading"><div><div class="eyebrow">HOW IT WORKS</div><h2>Attendance workflow</h2></div></div><ol class="workflow-list"><li><span>01</span><div><strong>Allow camera access</strong><p>Your browser securely opens the webcam.</p></div></li><li><span>02</span><div><strong>Center one face</strong><p>The frame is checked every few seconds.</p></div></li><li><span>03</span><div><strong>Confirm attendance</strong><p>A successful match updates this session.</p></div></li></ol></section>
+    <div class="privacy-note"><span>◆</span><p><strong>Privacy note</strong><br>Face comparison runs on the server. Camera frames are processed for matching and are not added to student records.</p></div>
+  </aside>
+</div>
+<canvas id="attendance-capture" class="hidden"></canvas>
+{% endblock %}
+{% block extra_scripts %}<script defer src="{% static 'js/camera.js' %}"></script>{% endblock %}

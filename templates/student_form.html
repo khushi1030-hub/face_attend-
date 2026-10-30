@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ page_title }} · Campus AI Attendance{% endblock %}
+{% block page_heading %}{{ page_title }}{% endblock %}
+{% block content %}
+<section class="page-heading-row"><div><div class="eyebrow">STUDENT DIRECTORY</div><h1>{{ page_title }}</h1><p class="muted">{% if is_edit %}Update verified student information and, if needed, replace the face photo.{% else %}Add student details and capture one clear face for recognition.{% endif %}</p></div><a class="button button-ghost" href="{% if is_edit %}{% url 'student-detail' student.pk %}{% else %}{% url 'student-list' %}{% endif %}">← Back</a></section>
+{% if form.non_field_errors %}<div class="form-alert">{{ form.non_field_errors }}</div>{% endif %}
+<form method="post" enctype="multipart/form-data" class="form-layout" id="student-form" novalidate>
+  {% csrf_token %}
+  <section class="panel form-panel"><div class="panel-heading"><div><div class="eyebrow">PROFILE DETAILS</div><h2>Student information</h2><p class="muted">Fields with an asterisk are required.</p></div><span class="step-badge">01</span></div>
+    <div class="field-grid">
+      <div class="form-field"><label for="id_name">Student name <em>*</em></label>{{ form.name }}{% for e in form.name.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</div>
+      <div class="form-field"><label for="id_roll_number">Roll number <em>*</em></label>{{ form.roll_number }}{% for e in form.roll_number.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</div>
+      <div class="form-field"><label for="id_branch">Branch / course <em>*</em></label>{{ form.branch }}{% for e in form.branch.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</div>
+      <div class="form-field"><label for="id_semester">Semester <em>*</em></label>{{ form.semester }}<small class="field-hint">Enter a semester from 1 to 12.</small>{% for e in form.semester.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</div>
+      <div class="form-field field-span"><label for="id_email">Email address <em>*</em></label>{{ form.email }}{% for e in form.email.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</div>
+    </div>
+  </section>
+  <section class="panel form-panel"><div class="panel-heading"><div><div class="eyebrow">FACE PROFILE</div><h2>Profile photo</h2><p class="muted">Exactly one clear face is required to register or replace the photo.</p></div><span class="step-badge">02</span></div>
+    <div class="photo-tabs"><button type="button" class="photo-tab active" data-photo-mode="upload">Upload image</button><button type="button" class="photo-tab" data-photo-mode="camera">Use webcam</button></div>
+    <div class="photo-mode" data-photo-panel="upload"><div class="upload-zone"><span class="upload-icon">⇧</span><div><strong>Choose a profile image</strong><p>JPEG, PNG or WebP · up to 6 MB</p>{{ form.profile_image }}{% for e in form.profile_image.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</div></div>{% if is_edit and student.profile_image %}<div class="current-photo"><img src="{% url 'student-photo' student.pk %}" alt="Current photo"><span>Current verified image · leave blank to keep it</span></div>{% endif %}</div>
+    <div class="photo-mode hidden" data-photo-panel="camera"><div class="capture-card"><div class="video-stage small-video-stage"><video id="registration-video" autoplay playsinline muted></video><div class="face-guide" aria-hidden="true"><i></i></div><div class="video-placeholder" id="registration-placeholder"><span class="camera-placeholder-icon">◎</span><span>Camera preview will appear here</span><small>Allow camera access to continue</small></div><span class="video-label"><i></i> CAMERA PREVIEW</span></div><div class="camera-controls"><button type="button" class="button button-secondary button-compact" data-action="start-registration-camera">Start camera</button><button type="button" class="button button-primary button-compact" data-action="capture-student-face" disabled>Capture face</button><span id="registration-camera-status" class="muted">Camera not started</span></div><canvas id="registration-capture" class="hidden"></canvas></div>{% for e in form.webcam_image.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</div>
+    {{ form.webcam_image }}<div id="capture-preview" class="capture-preview hidden"><span>✓ Face image captured. Submit to validate and save its encoding.</span><button type="button" class="text-link" data-action="retake-student-photo">Retake</button></div>
+  </section>
+  <div class="form-actions"><p><span class="secure-lock">◆</span> Face encodings stay on the server and are not displayed.</p><button class="button button-primary" type="submit">{% if is_edit %}Save changes{% else %}Register student{% endif %} <span>→</span></button></div>
+</form>
+{% endblock %}
+{% block extra_scripts %}<script defer src="{% static 'js/camera.js' %}"></script>{% endblock %}

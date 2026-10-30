@@ -1,0 +1,15 @@
+{
+  "routes": [
+    {"path":"/","title":"Home"},
+    {"path":"/login/","title":"Admin login"},
+    {"path":"/dashboard/","title":"Dashboard"},
+    {"path":"/students/","title":"Students"},
+    {"path":"/students/register/","title":"Register student"},
+    {"path":"/students/:pk/","title":"Student details"},
+    {"path":"/students/:pk/edit/","title":"Edit student"},
+    {"path":"/attendance/mark/","title":"Mark attendance"},
+    {"path":"/attendance/records/","title":"Attendance records"},
+    {"path":"/settings/","title":"Settings"},
+    {"path":"/admin/","title":"Django administrator"}
+  ]
+}

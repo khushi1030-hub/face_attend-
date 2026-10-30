@@ -1,0 +1,11 @@
+{
+  "include": ["attendance", "attendance_system", "manage.py"],
+  "exclude": [".venv", "media", "staticfiles"],
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.12",
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [".venv/lib/python3.12/site-packages"],
+  "reportMissingImports": "error",
+  "reportMissingTypeStubs": "none"
+}

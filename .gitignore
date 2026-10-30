@@ -1,0 +1,22 @@
+# Environment secrets and local database
+.env
+*.sqlite3
+
+# Uploaded development media
+/media/
+
+# Python environments and cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Django collected static files
+/staticfiles/
+
+# Local editor/OS files
+.DS_Store
+.vscode/
+.idea/

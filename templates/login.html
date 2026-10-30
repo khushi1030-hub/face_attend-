@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sign in · Campus AI Attendance{% endblock %}
+{% block auth_content %}
+<div class="auth-screen">
+  <section class="auth-panel glass-panel">
+    <a class="auth-brand" href="{% url 'login' %}"><img src="{% static 'images/project-logo.png' %}" alt="" width="48" height="48"><span><strong>Campus<span>AI</span></strong><small>ATTENDANCE MANAGEMENT</small></span></a>
+    <div class="auth-eyebrow"><span class="eyebrow-dot"></span> SECURE ADMIN PORTAL</div>
+    <h1>Welcome back.</h1>
+    <p class="muted">Sign in with your administrator account to manage attendance.</p>
+    {% if form.non_field_errors %}<div class="form-alert">{{ form.non_field_errors }}</div>{% endif %}
+    <form method="post" class="auth-form" novalidate>
+      {% csrf_token %}
+      <label for="id_username">Username</label>
+      <div class="input-with-icon"><span>♙</span>{{ form.username }}</div>
+      {% for error in form.username.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      <label for="id_password">Password</label>
+      <div class="input-with-icon"><span>⌑</span>{{ form.password }}</div>
+      {% for error in form.password.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      <button class="button button-primary button-full" type="submit">Sign in <span aria-hidden="true">→</span></button>
+    </form>
+    <div class="auth-footnote"><span class="secure-lock">◆</span> Your session is protected with Django authentication and CSRF security.</div>
+  </section>
+  <aside class="auth-aside"><div class="ambient-orb orb-one"></div><div class="ambient-orb orb-two"></div><div class="auth-aside-content"><div class="scan-symbol"><span></span><span></span><span></span><span></span><i></i></div><div class="eyebrow">SMARTER CAMPUS OPERATIONS</div><h2>Attendance,<br><em>with clarity.</em></h2><p>Secure face recognition. Reliable daily records. A simpler view of campus presence.</p><div class="auth-aside-line"><span></span> Built for the classroom</div></div><div class="auth-aside-footer">CAMPUS AI ATTENDANCE <span>·</span> ADMIN CONSOLE</div></aside>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="theme-color" content="#071321">
+  <title>{% block title %}Campus AI Attendance{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'images/project-logo.png' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <script defer src="{% static 'js/main.js' %}"></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+{% if user.is_authenticated and user.is_staff %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="brand" href="{% url 'dashboard' %}">
+      <span class="brand-mark"><img src="{% static 'images/project-logo.png' %}" alt="" width="42" height="42"></span>
+      <span class="brand-copy"><strong>Campus<span>AI</span></strong><small>ATTENDANCE</small></span>
+    </a>
+    <div class="nav-caption">WORKSPACE</div>
+    <nav class="primary-nav">
+      <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'student-list' or request.resolver_match.url_name == 'student-detail' or request.resolver_match.url_name == 'student-edit' %}active{% endif %}" href="{% url 'student-list' %}"><span class="nav-icon">♙</span><span>Students</span></a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'student-create' %}active{% endif %}" href="{% url 'student-create' %}"><span class="nav-icon">＋</span><span>Register student</span></a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'mark-attendance' %}active{% endif %}" href="{% url 'mark-attendance' %}"><span class="nav-icon">◎</span><span>Mark attendance</span></a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'attendance-records' %}active{% endif %}" href="{% url 'attendance-records' %}"><span class="nav-icon">▤</span><span>Attendance records</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}"><span class="nav-icon">⚙</span><span>Settings</span></a>
+      <div class="sidebar-user">
+        <div class="avatar avatar-small">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</div>
+        <div class="sidebar-user-copy"><strong>{{ user.get_full_name|default:user.username }}</strong><small>Administrator</small></div>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="icon-button logout-icon" type="submit" aria-label="Log out" title="Log out">↗</button></form>
+      </div>
+      <form class="mobile-logout" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="nav-link" type="submit"><span class="nav-icon">↗</span><span>Logout</span></button></form>
+      <div class="sidebar-footnote">Privacy-first campus operations<br><span>Secure · Clear · Accountable</span></div>
+    </div>
+  </aside>
+  <div class="main-column">
+    <header class="topbar">
+      <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+      <div class="breadcrumb"><span>Workspace</span><b>/</b><strong>{% block page_heading %}Dashboard{% endblock %}</strong></div>
+      <div class="topbar-right"><span class="live-indicator"><i></i> SYSTEM READY</span><div class="avatar">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</div></div>
+    </header>
+    <main class="page-content">
+      {% if messages %}<div class="toast-stack" aria-live="polite">{% for message in messages %}<div class="toast toast-{{ message.tags|default:'info' }}"><span class="toast-mark">{% if 'success' in message.tags %}✓{% elif 'error' in message.tags %}!{% else %}i{% endif %}</span><span>{{ message }}</span><button type="button" class="toast-close" aria-label="Dismiss notification">×</button></div>{% endfor %}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>
